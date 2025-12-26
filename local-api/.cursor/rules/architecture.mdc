@@ -1,0 +1,383 @@
+---
+alwaysApply: true
+---
+
+# NestJS Architecture Rules
+
+This document outlines the architectural patterns and conventions for this NestJS application using TypeORM with PostgreSQL.
+
+## Overview
+
+This application follows NestJS best practices with a clear separation between:
+- **Domain Entities** (interfaces): Pure TypeScript interfaces representing business domain models
+- **Persistence Entities** (TypeORM entities): Database entities with TypeORM decorators
+- **Controllers**: Handle HTTP requests and responses
+- **Services**: Contain all business logic
+- **DTOs**: Data Transfer Objects for request validation
+
+## Directory Structure
+
+### Root Structure
+```
+src/
+├── interfaces/          # Domain entity interfaces (shared across modules)
+├── {feature_name}/      # Feature modules (e.g., todo_lists/)
+└── app.module.ts        # Root application module
+```
+
+### Feature Module Structure
+Each feature module must be self-contained in its own directory:
+
+```
+{feature_name}/
+├── {feature_name}.controller.ts    # HTTP request handlers
+├── {feature_name}.service.ts       # Business logic
+├── {feature_name}.entity.ts        # TypeORM entity
+├── {feature_name}.module.ts        # NestJS module definition
+├── {feature_name}.controller.spec.ts  # Controller tests
+└── dtos/                            # Data Transfer Objects
+    ├── create-{feature_name}.ts
+    └── update-{feature_name}.ts
+```
+
+## Domain Entities (Interfaces)
+
+### Location
+- All domain entity interfaces are stored in `src/interfaces/`
+- One interface per file: `{entity_name}.interface.ts`
+
+### Rules
+1. **Pure TypeScript interfaces** - No decorators, no TypeORM dependencies
+2. **Domain-focused** - Represent business concepts, not database structure
+3. **Shared across modules** - Can be imported by any module that needs the domain model
+4. **Used in controllers** - Controllers use interfaces for return types and type annotations
+
+### Example
+```typescript
+// src/interfaces/todo_list.interface.ts
+export interface TodoList {
+  id: number;
+  name: string;
+}
+```
+
+## TypeORM Entities
+
+### Location
+- Entities are located within their feature module directory
+- File name: `{entity_name}.entity.ts`
+
+### Rules
+1. **TypeORM decorators required** - Must use `@Entity()`, `@Column()`, `@PrimaryGeneratedColumn()`, etc.
+2. **Persistence layer only** - These represent the database schema
+3. **Used in services** - Services inject and use TypeORM repositories
+4. **Registered in modules** - Must be registered with `TypeOrmModule.forFeature([Entity])`
+5. **Separate from domain interfaces** - Even if they have the same name, they serve different purposes
+
+### Example
+```typescript
+// src/todo_lists/todo_list.entity.ts
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity()
+export class TodoList {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  name: string;
+}
+```
+
+## Controllers
+
+### Location
+- Controllers are located within their feature module directory
+- File name: `{feature_name}.controller.ts`
+
+### Rules
+1. **HTTP handling only** - Controllers handle HTTP requests, route parameters, and responses
+2. **No business logic** - All business logic must be delegated to services
+3. **Use interfaces for types** - Import and use domain interfaces from `src/interfaces/`
+4. **Use DTOs for request bodies** - Import DTOs from the module's `dtos/` directory
+5. **Delegate to services** - Call service methods and return their results
+6. **Use NestJS decorators** - `@Controller()`, `@Get()`, `@Post()`, `@Put()`, `@Delete()`, `@Body()`, `@Param()`
+
+### Example
+```typescript
+// src/todo_lists/todo_lists.controller.ts
+import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { TodoList } from '../interfaces/todo_list.interface';
+import { CreateTodoListDto } from './dtos/create-todo_list';
+import { TodoListsService } from './todo_lists.service';
+
+@Controller('api/todolists')
+export class TodoListsController {
+  constructor(private todoListsService: TodoListsService) {}
+
+  @Get()
+  index(): Promise<TodoList[]> {
+    return this.todoListsService.all();
+  }
+
+  @Post()
+  create(@Body() dto: CreateTodoListDto): Promise<TodoList> {
+    return this.todoListsService.create(dto);
+  }
+}
+```
+
+## Services
+
+### Location
+- Services are located within their feature module directory
+- File name: `{feature_name}.service.ts`
+
+### Rules
+1. **All business logic** - Services contain all business logic and data access
+2. **Use TypeORM entities** - Inject TypeORM repositories using `@InjectRepository(Entity)`
+3. **Return interfaces** - Service methods should return domain interfaces (not TypeORM entities)
+4. **Injectable decorator** - Must be decorated with `@Injectable()`
+5. **Repository injection** - Use `@InjectRepository(Entity)` to inject TypeORM repositories
+6. **Async methods** - All data access methods should be async and return Promises
+
+### Example
+```typescript
+// src/todo_lists/todo_lists.service.ts
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { TodoList } from './todo_list.entity';
+import { CreateTodoListDto } from './dtos/create-todo_list';
+import { TodoList as TodoListInterface } from '../interfaces/todo_list.interface';
+
+@Injectable()
+export class TodoListsService {
+  constructor(
+    @InjectRepository(TodoList)
+    private readonly todoListRepository: Repository<TodoList>,
+  ) {}
+
+  async all(): Promise<TodoListInterface[]> {
+    return await this.todoListRepository.find();
+  }
+
+  async create(dto: CreateTodoListDto): Promise<TodoListInterface> {
+    const todoList = this.todoListRepository.create({ name: dto.name });
+    return await this.todoListRepository.save(todoList);
+  }
+}
+```
+
+## DTOs (Data Transfer Objects)
+
+### Location
+- DTOs are located in a `dtos/` subdirectory within each feature module
+- File names: `create-{feature_name}.ts` and `update-{feature_name}.ts`
+
+### Rules
+1. **Plain classes** - DTOs are TypeScript classes (no validation decorators for now)
+2. **Request validation** - Used to validate and type incoming request data
+3. **Separate create/update** - Use separate DTOs for create and update operations
+4. **Used in controllers** - Controllers receive DTOs via `@Body()` decorator
+5. **Passed to services** - Services receive DTOs as parameters
+
+### Example
+```typescript
+// src/todo_lists/dtos/create-todo_list.ts
+export class CreateTodoListDto {
+  name: string;
+}
+
+// src/todo_lists/dtos/update-todo_list.ts
+export class UpdateTodoListDto {
+  name: string;
+}
+```
+
+## Modules
+
+### Location
+- Modules are located within their feature module directory
+- File name: `{feature_name}.module.ts`
+
+### Rules
+1. **Feature module registration** - Register controllers, services, and TypeORM entities
+2. **TypeORM feature import** - Use `TypeOrmModule.forFeature([Entity])` to register entities
+3. **Export services** - Export services if they need to be used by other modules
+4. **Self-contained** - Each feature module should be self-contained
+
+### Example
+```typescript
+// src/todo_lists/todo_lists.module.ts
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TodoList } from './todo_list.entity';
+import { TodoListsController } from './todo_lists.controller';
+import { TodoListsService } from './todo_lists.service';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([TodoList])],
+  controllers: [TodoListsController],
+  providers: [TodoListsService],
+  exports: [TodoListsService], // Export if needed by other modules
+})
+export class TodoListsModule {}
+```
+
+## Naming Conventions
+
+### Files
+- **Controllers**: `{feature_name}.controller.ts`
+- **Services**: `{feature_name}.service.ts`
+- **Entities**: `{entity_name}.entity.ts`
+- **Modules**: `{feature_name}.module.ts`
+- **Interfaces**: `{entity_name}.interface.ts`
+- **DTOs**: `create-{feature_name}.ts`, `update-{feature_name}.ts`
+- **Tests**: `{feature_name}.controller.spec.ts`, `{feature_name}.service.spec.ts`
+
+### Classes
+- **Controllers**: `{FeatureName}Controller` (PascalCase)
+- **Services**: `{FeatureName}Service` (PascalCase)
+- **Entities**: `{EntityName}` (PascalCase, same as interface name)
+- **Modules**: `{FeatureName}Module` (PascalCase)
+- **Interfaces**: `{EntityName}` (PascalCase)
+- **DTOs**: `Create{EntityName}Dto`, `Update{EntityName}Dto` (PascalCase)
+
+### Directories
+- **Feature modules**: `{feature_name}/` (snake_case)
+- **DTOs folder**: `dtos/` (lowercase)
+
+## Testing Guidelines
+
+### Framework
+- **Jest** - Primary testing framework
+- **@nestjs/testing** - NestJS testing utilities
+- **ts-jest** - TypeScript transformer for Jest
+
+### Test File Location
+- Test files are co-located with the files they test
+- Naming: `{feature_name}.controller.spec.ts`, `{feature_name}.service.spec.ts`
+
+### Controller Testing
+
+#### Setup
+1. Use `Test.createTestingModule()` from `@nestjs/testing`
+2. Mock TypeORM repositories using `getRepositoryToken(Entity)`
+3. Create a mock repository object with Jest mock functions
+4. Initialize the NestJS application for integration testing
+
+#### Structure
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Entity } from './entity.entity';
+import { Controller } from './controller';
+import { Service } from './service';
+
+describe('ControllerName', () => {
+  let app: INestApplication;
+  let controller: Controller;
+  let repositoryMock: jest.Mocked<Record<string, jest.Mock>>;
+
+  beforeEach(async () => {
+    // Create mock repository
+    repositoryMock = {
+      find: jest.fn(),
+      findOneBy: jest.fn(),
+      save: jest.fn(),
+      delete: jest.fn(),
+      create: jest.fn(),
+    };
+
+    // Create testing module
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [Controller],
+      providers: [
+        Service,
+        {
+          provide: getRepositoryToken(Entity),
+          useValue: repositoryMock,
+        },
+      ],
+    }).compile();
+
+    app = module.createNestApplication();
+    await app.init();
+
+    controller = module.get<Controller>(Controller);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  // Test cases...
+});
+```
+
+#### Test Cases
+1. **Group by method** - Use `describe()` blocks for each controller method
+2. **Arrange-Act-Assert** - Structure tests with setup, execution, and verification
+3. **Mock repository methods** - Use `mockResolvedValue()` for async repository methods
+4. **Verify calls** - Use `toHaveBeenCalledWith()` to verify correct parameters
+
+#### Example Test
+```typescript
+describe('index', () => {
+  it('should return all items', async () => {
+    const mockItems = [
+      { id: 1, name: 'Item 1' },
+      { id: 2, name: 'Item 2' },
+    ];
+
+    repositoryMock.find.mockResolvedValue(mockItems);
+
+    const result = await controller.index();
+
+    expect(result).toEqual(mockItems);
+  });
+});
+```
+
+### Running Tests
+- **All tests**: `npm test`
+- **Watch mode**: `npm run test:watch`
+- **Coverage**: `npm run test:cov`
+- **Debug**: `npm run test:debug`
+- **E2E tests**: `npm run test:e2e`
+
+### Test Configuration
+Jest configuration is defined in `package.json`:
+- Test files: `.*\\.spec\\.ts$`
+- Root directory: `src`
+- Transformer: `ts-jest`
+- Environment: `node`
+
+## Key Principles
+
+1. **Separation of Concerns**
+   - Controllers handle HTTP
+   - Services handle business logic
+   - Entities handle persistence
+   - Interfaces represent domain models
+
+2. **Dependency Injection**
+   - Use NestJS DI for all dependencies
+   - Inject repositories in services
+   - Inject services in controllers
+
+3. **Type Safety**
+   - Use TypeScript interfaces for domain models
+   - Use DTOs for request validation
+   - Maintain type safety throughout the application
+
+4. **Modularity**
+   - Each feature is self-contained
+   - Modules can export services for reuse
+   - Clear boundaries between features
+
+5. **Testability**
+   - Mock external dependencies (repositories)
+   - Test controllers and services independently
+   - Use NestJS testing utilities
