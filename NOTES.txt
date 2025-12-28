@@ -5,13 +5,16 @@ My assumptions:
     the right to-do list on our "local-api"
 
 My proposed solution for the synchronization problem is the following:
-
 - Adding an external_id column to the to-do list table to keep track of the external id of the to-do list
 - Our local api retains all the endpoints we had from the nest js interview
 - Whenever we create, update or delete a to-do list, we send it to the external api via an event that gets
 queued to be sent to the external api.
 - For to-do lists created or updated on the external api, we use a cron job to periodically check for them
 and send them to the queue to be created or updated on our local api.
+
+A couple of things to take into consideration:
+- I did not implement a retry, even if I would like to I feel like I cannot test it properly, my idea would be to
+store failed events on the db and retry them exponentially
 
 Some extra comments:
 - I do not have the external api code, so I cannot test it completely.
