@@ -6,7 +6,7 @@ export class TodoList {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   external_id: string | null;
 
   @Column()

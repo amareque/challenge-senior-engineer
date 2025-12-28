@@ -1,0 +1,23 @@
+In this problem we have to syncronize two different APIs, our "local-api" and the external one.
+
+My assumptions:
+    - I'm making the assumption that source_id on the external api is set for me to tell it how to find
+    the right to-do list on our "local-api"
+
+My proposed solution for the synchronization problem is the following:
+
+- Adding an external_id column to the to-do list table to keep track of the external id of the to-do list
+- Our local api retains all the endpoints we had from the nest js interview
+- Whenever we create, update or delete a to-do list, we send it to the external api via an event that gets
+queued to be sent to the external api.
+- For to-do lists created or updated on the external api, we use a cron job to periodically check for them
+and send them to the queue to be created or updated on our local api.
+
+Some extra comments:
+- I do not have the external api code, so I cannot test it completely.
+- To run the api you just have to:
+    - Run the container with
+    "docker-compose -f docker-compose.yml -f .devcontainer/docker-compose.yml up -d" on the local-api directory
+    - Enter the app docker with "docker exec -it nestjs-interview-app-1 bash"
+    - Run "npm install if not done earlier"
+    - Run "npm run start"
