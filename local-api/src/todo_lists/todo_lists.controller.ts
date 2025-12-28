@@ -12,6 +12,7 @@ import { CreateTodoListDto } from './dtos/create-todo_list';
 import { UpdateTodoListDto } from './dtos/update-todo_list';
 import { TodoList } from '../interfaces/todo_list.interface';
 import { TodoListsService } from './todo_lists.service';
+import { DeletionJob } from '../interfaces/deletion_job.interface';
 
 @Controller('api/todolists')
 export class TodoListsController {
@@ -41,7 +42,7 @@ export class TodoListsController {
   }
 
   @Delete('/:todoListId')
-  delete(@Param() param: { todoListId: number }): Promise<void> {
+  delete(@Param() param: { todoListId: number }): Promise<DeletionJob> {
     return this.todoListsService.delete(param.todoListId);
   }
 

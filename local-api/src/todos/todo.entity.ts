@@ -12,6 +12,9 @@ export class Todo {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ nullable: true })
+  external_id: string | null;
+
   @Column()
   title: string;
 

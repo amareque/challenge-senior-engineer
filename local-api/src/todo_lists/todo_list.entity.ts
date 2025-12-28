@@ -6,6 +6,9 @@ export class TodoList {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ nullable: true })
+  external_id: string | null;
+
   @Column()
   name: string;
 

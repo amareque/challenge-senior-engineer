@@ -1,7 +1,6 @@
-version: '3.8'
 services:
   app:
-    image: mcr.microsoft.com/devcontainers/typescript-node:0-18     
+    image: mcr.microsoft.com/devcontainers/typescript-node:0-20
     volumes:
       - .:/workspaces/nestjs-interview
     ports:
@@ -12,8 +11,10 @@ services:
       - DB_USERNAME=postgres
       - DB_PASSWORD=postgres
       - DB_DATABASE=nestjs_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
     depends_on:
       - postgres
+      - rabbitmq
     networks:
       - nestjs-network
 
@@ -28,6 +29,17 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nestjs-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
     networks:
       - nestjs-network
 

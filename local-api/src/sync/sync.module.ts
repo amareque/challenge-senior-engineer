@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Todo } from './todo.entity';
+import { SyncService } from './sync.service';
+import { SyncConsumer } from './sync.consumer';
+import { SyncScheduler } from './sync.scheduler';
 import { TodoList } from '../todo_lists/todo_list.entity';
-import { TodosController } from './todos.controller';
-import { TodosService } from './todos.service';
+import { Todo } from '../todos/todo.entity';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Todo, TodoList]),
+    TypeOrmModule.forFeature([TodoList, Todo]),
     ClientsModule.registerAsync([
       {
         imports: [ConfigModule],
@@ -33,8 +34,9 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
       },
     ]),
   ],
-  controllers: [TodosController],
-  providers: [TodosService],
-  exports: [TodosService],
+  controllers: [SyncConsumer],
+  providers: [SyncService, SyncScheduler],
+  exports: [SyncService],
 })
-export class TodosModule {}
+export class SyncModule {}
+
